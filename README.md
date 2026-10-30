@@ -1,6 +1,6 @@
-# network — Network Device Management and Connectivity (Ping) Monitoring
+# Network Device Management and Connectivity (Ping) Monitoring
 
-Implementation of the Senior Java Developer take-home assignment, built with **Java 17 + Spring Boot 3.3 + Spring Data JPA + H2 (file)**.
+Implementation of the Senior Java Developer take-home assignment for Fanap Telecom, built with **Java 17 + Spring Boot 3.3 + Spring Data JPA + H2 (file)**.
 
 ## Running
 
@@ -47,29 +47,6 @@ The public API is documented with [springdoc-openapi](https://springdoc.org/).
 - Endpoints are grouped into three tags: **Devices**, **Ping** and **Monitor**.
 - Every operation lists its possible responses, including the error codes and the shared error body (`ApiError`).
 - Only `/api/**` is documented. The internal service endpoints (`/internal/**`) are deliberately hidden.
-
-Setup:
-
-```xml
-<!-- pom.xml -->
-<dependency>
-  <groupId>org.springdoc</groupId>
-  <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
-  <version>2.6.0</version> <!-- the 2.6.x line matches Spring Boot 3.3.x -->
-</dependency>
-```
-
-```yaml
-# application.yml
-springdoc:
-  paths-to-match: /api/**
-  swagger-ui:
-    path: /swagger-ui.html
-    operations-sorter: method
-    tags-sorter: alpha
-```
-
-API metadata (title, version, description) is defined in `OpenApiConfig`, and the descriptions and examples come from `@Tag`, `@Operation`, `@ApiResponse`, `@Parameter` and `@Schema` annotations on the controllers and request records.
 
 ## Architecture
 
