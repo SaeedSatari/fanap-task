@@ -11,10 +11,10 @@
     <relativePath/>
   </parent>
 
-  <groupId>com.netmon</groupId>
-  <artifactId>netmon</artifactId>
+  <groupId>com.network</groupId>
+  <artifactId>network</artifactId>
   <version>1.0.0</version>
-  <name>netmon</name>
+  <name>network</name>
   <description>Network device management and connectivity (ping) monitoring</description>
 
   <properties>

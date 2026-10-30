@@ -1,4 +1,4 @@
-# Netmon — مدیریت تجهیزات شبکه و پایش اتصال (Ping)
+# network — مدیریت تجهیزات شبکه و پایش اتصال (Ping)
 
 پیاده‌سازی تمرین Senior Java Developer با **Java 17 + Spring Boot 3.3 + Spring Data JPA + H2 (file)**.
 
@@ -11,8 +11,8 @@
 ```bash
 docker compose up -d --build                      # ساخت و اجرا؛ پایگاه‌داده روی volume می‌ماند
 docker compose --profile test run --rm smoke      # اسموک‌تست (بعد از healthy شدن برنامه شروع می‌شود)
-docker compose restart netmon                     # نمایش recovery بعد از restart
-docker compose logs -f netmon                     # لاگ برنامه
+docker compose restart network                     # نمایش recovery بعد از restart
+docker compose logs -f network                     # لاگ برنامه
 docker compose down                               # توقف (با -v داده‌ها هم پاک می‌شود)
 ```
 
@@ -32,7 +32,7 @@ mvn spring-boot:run   # اجرا روی http://localhost:8080
 - `./smoke-test.sh [base-url]` — اسموک‌تست خودکار (فقط bash + curl، حدود ۱۵ ثانیه). اگر سرور در دسترس نباشد با پیام روشن و کد خروج ۲ متوقف می‌شود؛ در پایان تعداد موفق/ناموفق چاپ می‌شود.
 - `requests.http` — نمونه درخواست‌ها (IntelliJ / VS Code REST Client).
 
-داده‌ها در `./data/netmon.mv.db` (یا volume داکر) ذخیره می‌شود تا بعد از restart باقی بماند؛ برای نمایش recovery لازم است.
+داده‌ها در `./data/network.mv.db` (یا volume داکر) ذخیره می‌شود تا بعد از restart باقی بماند؛ برای نمایش recovery لازم است.
 
 ## معماری
 
@@ -51,7 +51,7 @@ Client ─► /api/v1/**  (PingApiController, MonitorApiController, DeviceContro
 
 **چرا Monolith؟** برای این دامنه کوچک، دیپلوی و تراکنش ساده‌تر است. ولی مرز سرویس‌ها واقعی است
 (قرارداد HTTP، کلاینت جدا، timeout جدا). برای جدا کردن هرکدام کافی است
-`netmon.clients.ping.base-url` / `netmon.clients.monitor.base-url` را روی آدرس دیگری بگذارید؛
+`network.clients.ping.base-url` / `network.clients.monitor.base-url` را روی آدرس دیگری بگذارید؛
 اولین کاندیدای جداسازی Ping worker است (نیاز به scale جدا دارد). در آن حالت باید `/internal/**` فقط در شبکه داخلی در دسترس باشد
 و دیتابیس مشترک با یک message queue/outbox جایگزین شود.
 
@@ -91,7 +91,7 @@ PENDING ──claim──► RUNNING ──موفق─────────�
 | Queue پر | عملیات در DB `PENDING` می‌ماند و بعداً توسط sweeper برداشته می‌شود. |
 
 > فرض: هنگام startup همه‌ی `RUNNING`ها متعلق به process قبلی‌اند (تک‌instance). برای چند instance،
-> `netmon.recovery.requeue-running-on-startup=false` بگذارید تا فقط lease ملاک باشد.
+> `network.recovery.requeue-running-on-startup=false` بگذارید تا فقط lease ملاک باشد.
 
 ## رفتار RestTemplate (Timeout، خطای HTTP، پاسخ نامعتبر)
 
@@ -122,7 +122,7 @@ POST هرگز خودکار retry نمی‌شود؛ کلاینت می‌توان�
 | GET | `/api/v1/devices/{id}/monitor?window` | آمار: availability، میانگین/min/max زمان پاسخ، آخرین عملیات‌ها |
 
 اگر `monitoringEnabled=false` باشد، ping دستی هم رد می‌شود (`422 MONITORING_DISABLED`) و پایش خودکار انجام نمی‌شود.
-برای دستگاه‌هایی که پایش‌شان فعال است، هر `netmon.monitoring.interval-ms` (پیش‌فرض ۳۰ ثانیه) خودکار ping ثبت می‌شود.
+برای دستگاه‌هایی که پایش‌شان فعال است، هر `network.monitoring.interval-ms` (پیش‌فرض ۳۰ ثانیه) خودکار ping ثبت می‌شود.
 
 ## Ping شبیه‌سازی‌شده
 
@@ -133,7 +133,7 @@ POST هرگز خودکار retry نمی‌شود؛ کلاینت می‌توان�
 | `192.0.2.x` | دستگاه خاموش (`SUCCEEDED`, `reachable=false`) |
 | `198.51.100.x` | probe جواب نمی‌دهد → timeout → `TIMED_OUT` |
 | `203.0.113.x` | probe خطا می‌دهد → retry → `FAILED` |
-| بقیه | latency تصادفی؛ احتمال خاموشی و خطای گذرا قابل تنظیم (`netmon.mock.*`) |
+| بقیه | latency تصادفی؛ احتمال خاموشی و خطای گذرا قابل تنظیم (`network.mock.*`) |
 
 ## تست‌ها
 

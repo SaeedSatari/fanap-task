@@ -3,10 +3,10 @@ server:
 
 spring:
   application:
-    name: netmon
+    name: network
   datasource:
     # File-based H2 so that data (and in-flight operations) survive an application restart.
-    url: jdbc:h2:file:./data/netmon;LOCK_TIMEOUT=10000
+    url: jdbc:h2:file:./data/network;LOCK_TIMEOUT=10000
     username: sa
     password: ""
   jpa:
@@ -14,7 +14,7 @@ spring:
     hibernate:
       ddl-auto: update
 
-netmon:
+network:
   ping:
     timeout: 3s              # max time a single (mock) ping may take
     max-attempts: 3          # 1 initial attempt + 2 retries

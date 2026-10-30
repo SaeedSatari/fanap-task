@@ -1,11 +1,11 @@
 services:
-  netmon:
+  network:
     build: .
-    image: netmon:local
+    image: network:local
     ports:
       - "8080:8080"
     volumes:
-      - netmon-data:/app/data
+      - network-data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://localhost:8080/api/v1/devices?size=1"]
       interval: 5s
@@ -18,13 +18,13 @@ services:
   # از همان ایمیج برنامه استفاده می‌کند (bash و curl دارد)، پس چیزی دانلود نمی‌شود.
   smoke:
     profiles: ["test"]
-    image: netmon:local
+    image: network:local
     depends_on:
-      netmon:
+      network:
         condition: service_healthy
     volumes:
       - ./smoke-test.sh:/smoke-test.sh:ro
-    entrypoint: ["bash", "/smoke-test.sh", "http://netmon:8080"]
+    entrypoint: ["bash", "/smoke-test.sh", "http://network:8080"]
 
 volumes:
-  netmon-data:
+  network-data:
