@@ -2,22 +2,20 @@ package com.network.ping;
 
 import com.network.common.ApiException;
 import com.network.device.DeviceRepository;
-import java.util.List;
-import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.UUID;
+
 @Service
+@RequiredArgsConstructor
 public class PingQueryService {
 
     private final PingOperationRepository operations;
     private final DeviceRepository devices;
-
-    public PingQueryService(PingOperationRepository operations, DeviceRepository devices) {
-        this.operations = operations;
-        this.devices = devices;
-    }
 
     @Transactional(readOnly = true)
     public PingOperation get(UUID id) {

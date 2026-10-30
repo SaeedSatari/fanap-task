@@ -8,30 +8,26 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Every state transition of an operation (and the matching device update) is one short transaction. */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class PingOperationStore {
 
-    private static final Logger log = LoggerFactory.getLogger(PingOperationStore.class);
     private static final int MAX_ERROR_LENGTH = 500;
 
     private final PingOperationRepository operations;
     private final DeviceRepository devices;
     private final NetworkProperties props;
     private final Clock clock;
-
-    public PingOperationStore(PingOperationRepository operations, DeviceRepository devices,
-                              NetworkProperties props, Clock clock) {
-        this.operations = operations;
-        this.devices = devices;
-        this.props = props;
-        this.clock = clock;
-    }
 
     /** PENDING -> RUNNING with a lease. Empty when someone else already claimed it (or it is not due yet). */
     @Transactional
@@ -89,7 +85,7 @@ public class PingOperationStore {
 
     /**
      * Resolves operations stuck in RUNNING (worker crashed, application restarted, lease expired):
-     * re-queue them if attempts remain, otherwise fail them. Probing is idempotent, so re-running is safe.
+     * re-queue them if attempts to remain, otherwise fail them. Probing is idempotent, so re-running is safe.
      *
      * @param cutoff operations whose lease expires before this instant are considered orphaned
      */

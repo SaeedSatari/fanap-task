@@ -1,154 +1,188 @@
-# network — مدیریت تجهیزات شبکه و پایش اتصال (Ping)
+# network — Network Device Management and Connectivity (Ping) Monitoring
 
-پیاده‌سازی تمرین Senior Java Developer با **Java 17 + Spring Boot 3.3 + Spring Data JPA + H2 (file)**.
+Implementation of the Senior Java Developer take-home assignment, built with **Java 17 + Spring Boot 3.3 + Spring Data JPA + H2 (file)**.
 
-## اجرا
+## Running
 
-### با Docker Compose (پیشنهادی)
+### With Docker Compose (recommended)
 
-نیازی به نصب Java یا Maven نیست.
-
-```bash
-docker compose up -d --build                      # ساخت و اجرا؛ پایگاه‌داده روی volume می‌ماند
-docker compose --profile test run --rm smoke      # اسموک‌تست (بعد از healthy شدن برنامه شروع می‌شود)
-docker compose restart network                     # نمایش recovery بعد از restart
-docker compose logs -f network                     # لاگ برنامه
-docker compose down                               # توقف (با -v داده‌ها هم پاک می‌شود)
-```
-
-- سرویس `smoke` از همان ایمیج برنامه استفاده می‌کند (`bash` و `curl` دارد)، پس چیزی دانلود نمی‌کند.
-- ساخت اول به‌دلیل دانلود وابستگی‌های Maven طولانی است؛ Maven با cache mount کار می‌کند و دفعات بعد سریع است.
-- اگر پورت ۸۰۸۰ مشغول است، در `docker-compose.yml` مقدار `"8080:8080"` را عوض کنید (مثلاً `"9090:8080"`).
-
-### بدون Docker
+No local Java or Maven installation is needed.
 
 ```bash
-mvn test              # همه‌ی تست‌های JUnit
-mvn spring-boot:run   # اجرا روی http://localhost:8080
+docker compose up -d --build                      # build and run; the database lives on a volume
+docker compose --profile test run --rm smoke      # smoke test (starts once the application is healthy)
+docker compose restart network                    # demonstrate recovery after a restart
+docker compose logs -f network                    # application logs
+docker compose down                               # stop (add -v to also delete the data)
 ```
 
-### تست API
+- The `smoke` service reuses the application image (it already contains `bash` and `curl`), so nothing is downloaded.
+- The first build is slow because Maven downloads its dependencies. Maven runs with a cache mount, so later builds are fast.
+- If port 8080 is taken, change `"8080:8080"` in `docker-compose.yml` (for example to `"9090:8080"`).
 
-- `./smoke-test.sh [base-url]` — اسموک‌تست خودکار (فقط bash + curl، حدود ۱۵ ثانیه). اگر سرور در دسترس نباشد با پیام روشن و کد خروج ۲ متوقف می‌شود؛ در پایان تعداد موفق/ناموفق چاپ می‌شود.
-- `requests.http` — نمونه درخواست‌ها (IntelliJ / VS Code REST Client).
+### Without Docker
 
-داده‌ها در `./data/network.mv.db` (یا volume داکر) ذخیره می‌شود تا بعد از restart باقی بماند؛ برای نمایش recovery لازم است.
+```bash
+mvn test              # all JUnit tests
+mvn spring-boot:run   # run on http://localhost:8080
+```
 
-## معماری
+### Testing the API
 
-انتخاب: **Modular Monolith** با دو «سرویس» منطقی که فقط از طریق HTTP و `RestTemplate` با هم صحبت می‌کنند.
+- **Swagger UI:** http://localhost:8080/swagger-ui.html (interactive, with "Try it out")
+- `./smoke-test.sh [base-url]` — automated smoke test (bash + curl only, about 15 seconds). If the server is not reachable it stops with a clear message and exit code 2. At the end it prints the number of passed and failed checks.
+- `requests.http` — sample requests (IntelliJ / VS Code REST Client).
+
+Data is stored in `./data/network.mv.db` (or in the Docker volume) so that it survives a restart. This is required to demonstrate recovery.
+
+## API documentation (Swagger / OpenAPI)
+
+The public API is documented with [springdoc-openapi](https://springdoc.org/).
+
+| URL | Content |
+|---|---|
+| `/swagger-ui.html` | Interactive Swagger UI |
+| `/v3/api-docs` | Raw OpenAPI 3 document (JSON) |
+
+- Endpoints are grouped into three tags: **Devices**, **Ping** and **Monitor**.
+- Every operation lists its possible responses, including the error codes and the shared error body (`ApiError`).
+- Only `/api/**` is documented. The internal service endpoints (`/internal/**`) are deliberately hidden.
+
+Setup:
+
+```xml
+<!-- pom.xml -->
+<dependency>
+  <groupId>org.springdoc</groupId>
+  <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+  <version>2.6.0</version> <!-- the 2.6.x line matches Spring Boot 3.3.x -->
+</dependency>
+```
+
+```yaml
+# application.yml
+springdoc:
+  paths-to-match: /api/**
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+```
+
+API metadata (title, version, description) is defined in `OpenApiConfig`, and the descriptions and examples come from `@Tag`, `@Operation`, `@ApiResponse`, `@Parameter` and `@Schema` annotations on the controllers and request records.
+
+## Architecture
+
+Choice: a **modular monolith** with two logical "services" that talk to each other only over HTTP using `RestTemplate`.
 
 ```
 Client ─► /api/v1/**  (PingApiController, MonitorApiController, DeviceController)
-              │  RestTemplate (timeout + error mapping)
-              ├─► /internal/ping/**     Ping service    (ثبت درخواست، اجرای async، تاریخچه)
-              └─► /internal/monitor/**  Monitor service (آمار دسترس‌پذیری و latency)
+              │  RestTemplate (timeouts + error mapping)
+              ├─► /internal/ping/**     Ping service    (request intake, async execution, history)
+              └─► /internal/monitor/**  Monitor service (availability and latency statistics)
                          │
                    Domain: Device, PingOperation  ─►  H2/JPA
                          │
                    Worker pool ─► PingProbe (Mock)
 ```
 
-**چرا Monolith؟** برای این دامنه کوچک، دیپلوی و تراکنش ساده‌تر است. ولی مرز سرویس‌ها واقعی است
-(قرارداد HTTP، کلاینت جدا، timeout جدا). برای جدا کردن هرکدام کافی است
-`network.clients.ping.base-url` / `network.clients.monitor.base-url` را روی آدرس دیگری بگذارید؛
-اولین کاندیدای جداسازی Ping worker است (نیاز به scale جدا دارد). در آن حالت باید `/internal/**` فقط در شبکه داخلی در دسترس باشد
-و دیتابیس مشترک با یک message queue/outbox جایگزین شود.
+**Why a monolith?** For a domain this small, deployment and transactions are simpler. The service boundaries are still real: an HTTP contract, a separate client and separate timeouts for each service. To split either one out, set `network.clients.ping.base-url` / `network.clients.monitor.base-url` to another address.
 
-## مدل داده
+**What to split first when scaling?** The ping worker, because it needs to scale independently (many slow, I/O-bound probes). When splitting it out:
+- `/internal/**` must only be reachable inside the internal network (or protected with mTLS).
+- The shared database should be replaced by a message queue or an outbox for handing operations to workers.
 
-- `devices`: id، name، ipAddress (یکتا)، type (`MODEM|RADIO`)، monitoringEnabled، lastStatus (`UP|DOWN|UNKNOWN`)، lastCheckedAt
-- `ping_operations`: id (UUID)، deviceId، idempotencyKey، status، attempts/maxAttempts، nextAttemptAt، leaseExpiresAt،
-  reachable، responseTimeMs، errorMessage، createdAt/startedAt/finishedAt  
-  قید یکتایی `(device_id, idempotency_key)`.
+## Data model
 
-## چرخه‌ی وضعیت عملیات
+- `devices`: id, name, ipAddress (unique), type (`MODEM|RADIO`), monitoringEnabled, lastStatus (`UP|DOWN|UNKNOWN`), lastCheckedAt
+- `ping_operations`: id (UUID), deviceId, idempotencyKey, status, attempts/maxAttempts, nextAttemptAt, leaseExpiresAt, reachable, responseTimeMs, errorMessage, createdAt/startedAt/finishedAt  
+  Unique constraint on `(device_id, idempotency_key)`.
+
+## Operation lifecycle
 
 ```
-PENDING ──claim──► RUNNING ──موفق──────────────────────────► SUCCEEDED (reachable true/false)
-   ▲                  │ خطا/timeout و attempt باقی است
+PENDING ──claim──► RUNNING ──success─────────────────────────► SUCCEEDED (reachable true/false)
+   ▲                  │ error/timeout, attempts left
    └──── backoff ◄────┤
-                      ├─ خطا و attempt تمام ───────────────► FAILED
-                      ├─ timeout و attempt تمام ───────────► TIMED_OUT
-                      └─ lease منقضی / restart ───────────► PENDING (attempt باقی) یا FAILED
+                      ├─ error, no attempts left ────────────► FAILED
+                      ├─ timeout, no attempts left ──────────► TIMED_OUT
+                      └─ lease expired / restart ────────────► PENDING (attempts left) or FAILED
 ```
 
-نتیجه‌ی «دستگاه خاموش است» یک **عملیات موفق** با `reachable=false` است؛ `FAILED/TIMED_OUT` یعنی خودِ probe نتیجه‌ی قطعی نداد
-(وضعیت دستگاه در این حالت `UNKNOWN` می‌شود و در محاسبه‌ی availability لحاظ نمی‌شود).
+"The device is down" is a **successful operation** with `reachable=false`. `FAILED` / `TIMED_OUT` mean the probe itself could not produce a conclusive result. In that case the device status becomes `UNKNOWN` and the operation is not counted in availability.
 
-## صحت و هم‌زمانی
+## Correctness and concurrency
 
-| مسئله | راهکار |
+| Concern | Solution |
 |---|---|
-| درخواست تکراری | هدر `Idempotency-Key`: همان عملیات قبلی برگردانده می‌شود (200 + `Idempotent-Replayed: true`)، ping دوباره اجرا نمی‌شود. قید unique دیتابیس هم لایه‌ی دفاعی است. پایش خودکار هم کلید بر پایه‌ی بازه‌ی زمانی دارد. |
-| اجرای هم‌زمان روی یک تجهیز | هنگام ثبت، ردیف device با `SELECT … FOR UPDATE` قفل می‌شود؛ اگر عملیات `PENDING/RUNNING` وجود داشته باشد پاسخ `409 ACTIVE_OPERATION_EXISTS`. حذف device هم در همین حالت 409 است. |
-| دو worker روی یک عملیات | `claim` یک UPDATE شرطی (`PENDING→RUNNING`) است؛ فقط یک نفر برنده می‌شود. |
-| worker «زامبی» | هر تغییر وضعیت با شماره‌ی attempt محافظت می‌شود (fencing)؛ نتیجه‌ی attempt قدیمی نادیده گرفته می‌شود. |
-| نتیجه‌ی قدیمی روی وضعیت جدید | `lastStatus` فقط وقتی به‌روز می‌شود که `lastCheckedAt` جدیدتر یا مساوی باشد. |
-| Timeout | probe در thread جدا اجرا می‌شود و با `Future.get(timeout)` + `cancel(true)` قطع می‌شود. |
-| Retry | حداکثر `max-attempts` بار، backoff نمایی (1s, 2s, 4s … با سقف). |
-| Restart / crash | هر `RUNNING` یک lease دارد. هنگام startup همه‌ی `RUNNING`های باقی‌مانده و در حین اجرا هر lease منقضی، دوباره `PENDING` یا (اگر attempt تمام شده) `FAILED` می‌شود. Ping idempotent است، پس اجرای مجدد امن است. Sweeper هر ثانیه `PENDING`های سررسیده را هم dispatch می‌کند، پس هیچ عملیاتی در وضعیت نامشخص نمی‌ماند. |
-| Queue پر | عملیات در DB `PENDING` می‌ماند و بعداً توسط sweeper برداشته می‌شود. |
+| Duplicate request | `Idempotency-Key` header: the original operation is returned (200 + `Idempotent-Replayed: true`) and no new ping is executed. A database unique constraint is the second line of defense. Automatic monitoring uses a time-bucket key. |
+| Concurrent requests for one device | On submission the device row is locked with `SELECT … FOR UPDATE`. If a `PENDING`/`RUNNING` operation exists, the response is `409 ACTIVE_OPERATION_EXISTS`. Deleting the device in that state is also a 409. |
+| Two workers, one operation | `claim` is a conditional UPDATE (`PENDING→RUNNING`); only one caller wins. |
+| "Zombie" worker | Every state change is guarded by the attempt number (fencing); the result of a stale attempt is ignored. |
+| Old result overwriting a newer status | `lastStatus` is updated only if `lastCheckedAt` is newer than or equal to the stored value. |
+| Timeout | The probe runs in a separate thread and is interrupted with `Future.get(timeout)` + `cancel(true)`. |
+| Retry | Up to `max-attempts` attempts with exponential backoff (1s, 2s, 4s … capped). |
+| Restart / crash | Every `RUNNING` operation holds a lease. On startup all leftover `RUNNING` operations are recovered, and while running any operation with an expired lease is too: it goes back to `PENDING`, or to `FAILED` if no attempts remain. A ping is idempotent, so re-running it is safe. A sweeper also dispatches due `PENDING` operations every second, so nothing stays in an undefined state. |
+| Full queue | The operation stays `PENDING` in the database and is picked up later by the sweeper. |
 
-> فرض: هنگام startup همه‌ی `RUNNING`ها متعلق به process قبلی‌اند (تک‌instance). برای چند instance،
-> `network.recovery.requeue-running-on-startup=false` بگذارید تا فقط lease ملاک باشد.
+> Assumption: on startup, every `RUNNING` operation belongs to the previous process (single instance). For multiple instances set `network.recovery.requeue-running-on-startup=false` so that only the lease decides.
 
-## رفتار RestTemplate (Timeout، خطای HTTP، پاسخ نامعتبر)
+## RestTemplate behavior (timeout, HTTP errors, invalid responses)
 
-همه در `DownstreamCaller` تعریف شده است:
+All of it is defined in `DownstreamCaller`:
 
-| وضعیت | نتیجه برای کلاینت API | Retry |
+| Situation | Result for the API client | Retry |
 |---|---|---|
-| Timeout (connect/read) | `504 DOWNSTREAM_TIMEOUT` | فقط GET (پیش‌فرض ۱ بار) |
-| اتصال ممکن نیست | `503 DOWNSTREAM_UNAVAILABLE` | فقط GET |
-| HTTP 5xx | `502 DOWNSTREAM_ERROR` | فقط GET |
-| HTTP 4xx | همان status و code سرویس مقصد (مثلاً 404 `DEVICE_NOT_FOUND`، 409) | خیر |
-| بدنه‌ی خالی، JSON خراب، content-type اشتباه، فیلدهای ضروری ناموجود | `502 INVALID_DOWNSTREAM_RESPONSE` | خیر |
+| Timeout (connect/read) | `504 DOWNSTREAM_TIMEOUT` | GET only (default: 1 extra attempt) |
+| Connection not possible | `503 DOWNSTREAM_UNAVAILABLE` | GET only |
+| HTTP 5xx | `502 DOWNSTREAM_ERROR` | GET only |
+| HTTP 4xx | Same status and code as the downstream service (for example 404 `DEVICE_NOT_FOUND`, 409) | No |
+| Empty body, broken JSON, wrong content type, missing required fields | `502 INVALID_DOWNSTREAM_RESPONSE` | No |
 
-POST هرگز خودکار retry نمی‌شود؛ کلاینت می‌تواند با همان `Idempotency-Key` با خیال راحت دوباره بفرستد.
-همه‌ی خطاها با یک قالب یکسان برمی‌گردند: `{timestamp, status, code, message, details?}`.
+A POST is never retried automatically; the client can safely resend it with the same `Idempotency-Key`.
+All errors use one shape: `{timestamp, status, code, message, details?}`.
 
 ## API
 
-| Method | Path | توضیح |
+| Method | Path | Description |
 |---|---|---|
-| POST | `/api/v1/devices` | ایجاد (201) |
-| GET | `/api/v1/devices?page&size` | لیست صفحه‌بندی‌شده |
-| GET/PUT/DELETE | `/api/v1/devices/{id}` | خواندن / ویرایش / حذف |
+| POST | `/api/v1/devices` | Create (201) |
+| GET | `/api/v1/devices?page&size` | Paginated list |
+| GET/PUT/DELETE | `/api/v1/devices/{id}` | Read / update / delete |
 | PUT | `/api/v1/devices/{id}/monitoring` | `{ "enabled": true/false }` |
-| POST | `/api/v1/devices/{id}/pings` | شروع ping غیرهم‌زمان: 202 (جدید) / 200 (تکراری) |
-| GET | `/api/v1/pings/{operationId}` | وضعیت و نتیجه‌ی عملیات |
-| GET | `/api/v1/devices/{id}/pings?limit` | تاریخچه |
-| GET | `/api/v1/devices/{id}/monitor?window` | آمار: availability، میانگین/min/max زمان پاسخ، آخرین عملیات‌ها |
+| POST | `/api/v1/devices/{id}/pings` | Start an async ping: 202 (new) / 200 (replayed) |
+| GET | `/api/v1/pings/{operationId}` | Operation status and result |
+| GET | `/api/v1/devices/{id}/pings?limit` | History |
+| GET | `/api/v1/devices/{id}/monitor?window` | Statistics: availability, average/min/max response time, recent operations |
 
-اگر `monitoringEnabled=false` باشد، ping دستی هم رد می‌شود (`422 MONITORING_DISABLED`) و پایش خودکار انجام نمی‌شود.
-برای دستگاه‌هایی که پایش‌شان فعال است، هر `network.monitoring.interval-ms` (پیش‌فرض ۳۰ ثانیه) خودکار ping ثبت می‌شود.
+If `monitoringEnabled=false`, manual pings are rejected too (`422 MONITORING_DISABLED`) and no automatic pings are scheduled.
+For devices with monitoring enabled, a ping is scheduled automatically every `network.monitoring.interval-ms` (default: 30 seconds).
 
-## Ping شبیه‌سازی‌شده
+## Simulated ping
 
-`MockPingProbe` برای IPهای مستند (RFC 5737) رفتار قطعی دارد تا هر مسیر خطا قابل نمایش باشد:
+`MockPingProbe` behaves deterministically for the documentation IP ranges (RFC 5737), so every failure path can be demonstrated on demand:
 
-| IP | رفتار |
+| IP | Behavior |
 |---|---|
-| `192.0.2.x` | دستگاه خاموش (`SUCCEEDED`, `reachable=false`) |
-| `198.51.100.x` | probe جواب نمی‌دهد → timeout → `TIMED_OUT` |
-| `203.0.113.x` | probe خطا می‌دهد → retry → `FAILED` |
-| بقیه | latency تصادفی؛ احتمال خاموشی و خطای گذرا قابل تنظیم (`network.mock.*`) |
+| `192.0.2.x` | Device is down (`SUCCEEDED`, `reachable=false`) |
+| `198.51.100.x` | The probe never answers → timeout → `TIMED_OUT` |
+| `203.0.113.x` | The probe errors → retries → `FAILED` |
+| anything else | Random latency; the chance of being down or of a transient error is configurable (`network.mock.*`) |
 
-## تست‌ها
+## Tests
 
-- `DeviceRequestValidationTest`: اعتبارسنجی IP/name/type
-- `DeviceServiceTest`: IP تکراری، حذف هنگام عملیات فعال، به‌روزرسانی
-- `PingWorkerTest`: موفق / خطا / retry با backoff / timeout / آخرین attempt / claim ناموفق
-- `MonitorServiceTest`: محاسبه‌ی آمار
-- `PingServiceClientTest` و `MonitorServiceClientTest` (`MockRestServiceServer`): timeout، 5xx، 4xx، connection refused، JSON خراب، بدنه‌ی خالی، فیلد ناموجود، retry فقط برای GET
-- `PingOperationStoreIntegrationTest`: انتقال وضعیت‌ها، ذخیره‌ی نتیجه، claim هم‌زمان، attempt قدیمی، **recovery بعد از restart**
-- `PingSubmissionConcurrencyTest`: ۸ درخواست هم‌زمان → فقط یک عملیات؛ کلید یکسان → یک عملیات؛ تکرار کلید بعد از اتمام
-- `PingApiEndToEndTest`: کل جریان روی HTTP واقعی
-- `smoke-test.sh`: اسموک‌تست روی برنامه‌ی در حال اجرا (CRUD، idempotency، 409 هم‌زمان، timeout، retry، ۸ درخواست موازی)
+- `DeviceRequestValidationTest`: validation of IP, name and type
+- `DeviceServiceTest`: duplicate IP, deleting while an operation is active, updates
+- `PingWorkerTest`: success / error / retry with backoff / timeout / last attempt / failed claim
+- `MonitorServiceTest`: statistics calculation
+- `PingServiceClientTest` and `MonitorServiceClientTest` (`MockRestServiceServer`): timeout, 5xx, 4xx, connection refused, broken JSON, empty body, missing fields, retry for GET only
+- `PingOperationStoreIntegrationTest`: state transitions, result persistence, concurrent claim, stale attempt, **recovery after a restart**
+- `PingSubmissionConcurrencyTest`: 8 concurrent requests → only one operation; same key → one operation; repeating a key after completion
+- `PingApiEndToEndTest`: the whole flow over real HTTP
+- `smoke-test.sh`: smoke test against a running application (CRUD, idempotency, concurrent 409, timeout, retry, 8 parallel requests)
 
-## محدودیت‌ها و گام‌های بعدی
+## Limitations and next steps
 
-- IPv6 پشتیبانی نمی‌شود (فقط IPv4 اعتبارسنجی می‌شود).
-- `/internal/**` احراز هویت ندارد؛ در محیط واقعی باید فقط داخل شبکه/با mTLS در دسترس باشد.
-- برای production: PostgreSQL + Flyway به‌جای `ddl-auto=update`، و Micrometer برای متریک صف/تأخیر.
+- IPv6 is not supported (only IPv4 is validated).
+- `/internal/**` has no authentication; in a real deployment it must only be reachable inside the network or protected with mTLS.
+- For production: PostgreSQL + Flyway instead of `ddl-auto=update`, and Micrometer metrics for queue depth and latency.

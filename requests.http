@@ -2,7 +2,7 @@
 POST http://localhost:8080/api/v1/devices
 Content-Type: application/json
 
-{ "name": "Modem Muscat-01", "ipAddress": "10.0.0.11", "type": "MODEM", "monitoringEnabled": true }
+{ "name": "Modem Tehran-01", "ipAddress": "10.0.0.11", "type": "MODEM", "monitoringEnabled": true }
 
 ### List devices
 GET http://localhost:8080/api/v1/devices?page=0&size=20
@@ -14,7 +14,7 @@ GET http://localhost:8080/api/v1/devices/1
 PUT http://localhost:8080/api/v1/devices/1
 Content-Type: application/json
 
-{ "name": "Modem Muscat-01 (renamed)", "ipAddress": "10.0.0.11", "type": "MODEM" }
+{ "name": "Modem Tehran-01 (renamed)", "ipAddress": "10.0.0.11", "type": "MODEM" }
 
 ###
 DELETE http://localhost:8080/api/v1/devices/1

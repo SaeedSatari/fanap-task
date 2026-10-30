@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -25,9 +27,9 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(prefix = "network.recovery", name = "enabled", havingValue = "true", matchIfMissing = true)
+@Slf4j
 public class PingRecoveryScheduler {
 
-    private static final Logger log = LoggerFactory.getLogger(PingRecoveryScheduler.class);
 
     private final PingOperationStore store;
     private final PingOperationRepository operations;

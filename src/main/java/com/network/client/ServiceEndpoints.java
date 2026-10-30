@@ -1,24 +1,16 @@
 package com.network.client;
 
 import com.network.config.NetworkProperties;
+import lombok.RequiredArgsConstructor;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 
-/**
- * Resolves the base URL of each service. Blank => this very application (monolith deployment).
- * Setting {@code network.clients.ping.base-url} / {@code network.clients.monitor.base-url} is all it
- * takes to move a service into its own process.
- */
 @Component
+@RequiredArgsConstructor
 public class ServiceEndpoints {
 
     private final NetworkProperties props;
     private final Environment environment;
-
-    public ServiceEndpoints(NetworkProperties props, Environment environment) {
-        this.props = props;
-        this.environment = environment;
-    }
 
     public String pingBaseUrl() {
         return resolve(props.getClients().getPing().getBaseUrl());

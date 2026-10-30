@@ -59,7 +59,6 @@ class PingServiceClientTest {
         return (DownstreamException) t;
     }
 
-    // ---------- happy path ----------
 
     @Test
     void requestPing_accepted_forwardsIdempotencyKey() {
@@ -84,7 +83,6 @@ class PingServiceClientTest {
         assertThat(client.requestPing(1L, "abc-1").created()).isFalse();
     }
 
-    // ---------- timeout ----------
 
     @Test
     void timeout_onPost_mapsTo504_andIsNotRetried() {
@@ -96,7 +94,7 @@ class PingServiceClientTest {
             assertThat(e.getStatus().value()).isEqualTo(504);
             assertThat(e.getCode()).isEqualTo("DOWNSTREAM_TIMEOUT");
         });
-        server.verify(); // exactly one request was made
+        server.verify();
     }
 
     @Test
@@ -121,7 +119,6 @@ class PingServiceClientTest {
         });
     }
 
-    // ---------- HTTP errors ----------
 
     @Test
     void serverError_onPost_mapsTo502() {
@@ -172,7 +169,6 @@ class PingServiceClientTest {
         });
     }
 
-    // ---------- invalid responses ----------
 
     @Test
     void malformedJson_mapsToInvalidResponse() {
@@ -218,7 +214,7 @@ class PingServiceClientTest {
                 .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
 
         assertThatThrownBy(() -> client.getOperation(OP_ID)).isInstanceOf(DownstreamException.class);
-        server.verify(); // a retry would have failed: only one request was expected
+        server.verify();
     }
 
     @Test

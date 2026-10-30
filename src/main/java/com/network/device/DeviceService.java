@@ -3,8 +3,7 @@ package com.network.device;
 import com.network.common.ApiException;
 import com.network.ping.PingOperationRepository;
 import com.network.ping.PingStatus;
-import java.time.Clock;
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -12,18 +11,16 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.util.List;
+
 @Service
+@RequiredArgsConstructor
 public class DeviceService {
 
     private final DeviceRepository devices;
     private final PingOperationRepository operations;
     private final Clock clock;
-
-    public DeviceService(DeviceRepository devices, PingOperationRepository operations, Clock clock) {
-        this.devices = devices;
-        this.operations = operations;
-        this.clock = clock;
-    }
 
     @Transactional
     public Device create(CreateDeviceRequest request) {
@@ -36,7 +33,7 @@ public class DeviceService {
         try {
             return devices.saveAndFlush(device);
         } catch (DataIntegrityViolationException e) {
-            throw duplicateIp(ip); // lost a race with a concurrent create
+            throw duplicateIp(ip);
         }
     }
 

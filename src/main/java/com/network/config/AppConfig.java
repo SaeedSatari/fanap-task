@@ -1,16 +1,6 @@
 package com.network.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.Clock;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +9,12 @@ import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestTemplate;
+
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Configuration
 @EnableScheduling
@@ -30,7 +26,9 @@ public class AppConfig {
         return Clock.systemUTC();
     }
 
-    /** Bounded pool that runs ping operations. When full, work simply stays PENDING in the DB and is picked up later. */
+    /**
+     * Bounded pool that runs ping operations. When full, work simply stays PENDING in the DB and is picked up later.
+     */
     @Bean(name = "pingWorkerExecutor", destroyMethod = "shutdown")
     public ExecutorService pingWorkerExecutor(NetworkProperties props) {
         int threads = Math.max(1, props.getWorker().getThreads());
@@ -39,7 +37,9 @@ public class AppConfig {
                 named("ping-worker-"));
     }
 
-    /** Pool that actually runs the probe so that the worker thread can enforce a timeout on it. */
+    /**
+     * Pool that actually runs the probe so that the worker thread can enforce a timeout on it.
+     */
     @Bean(name = "pingProbeExecutor", destroyMethod = "shutdownNow")
     public ExecutorService pingProbeExecutor(NetworkProperties props) {
         int threads = Math.max(1, props.getWorker().getThreads()) * 2;

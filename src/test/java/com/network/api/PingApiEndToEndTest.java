@@ -42,7 +42,6 @@ class PingApiEndToEndTest {
 
     @Autowired TestRestTemplate rest;
 
-    // ---------- helpers ----------
 
     private ResponseEntity<Map<String, Object>> call(HttpMethod method, String url, Object body, String idempotencyKey) {
         HttpHeaders headers = new HttpHeaders();
@@ -76,7 +75,6 @@ class PingApiEndToEndTest {
         return call(HttpMethod.GET, "/api/v1/devices/" + id, null, null).getBody();
     }
 
-    // ---------- validation & CRUD ----------
 
     @Test
     void invalidDevice_isRejectedWithFieldDetails() {
@@ -137,7 +135,6 @@ class PingApiEndToEndTest {
                 .isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
-    // ---------- async ping flow ----------
 
     @Test
     void ping_isAsynchronous_idempotent_andUpdatesTheDevice() {
@@ -149,7 +146,6 @@ class PingApiEndToEndTest {
         assertThat(accepted.getHeaders().getLocation()).isNotNull();
         String operationId = (String) accepted.getBody().get("id");
 
-        // same key again: no second operation, original returned
         ResponseEntity<Map<String, Object>> replay =
                 call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, "req-1");
         assertThat(replay.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -168,7 +164,6 @@ class PingApiEndToEndTest {
         assertThat(deviceState.get("lastStatus")).isEqualTo("UP");
         assertThat(deviceState.get("lastCheckedAt")).isNotNull();
 
-        // history + monitor service (RestTemplate -> /internal/*)
         ResponseEntity<List<Map<String, Object>>> history = rest.exchange(
                 "/api/v1/devices/" + deviceId + "/pings", HttpMethod.GET, null, LIST);
         assertThat(history.getBody()).hasSize(1);
@@ -199,13 +194,11 @@ class PingApiEndToEndTest {
         String operationId = (String) call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null)
                 .getBody().get("id");
 
-        // a second request while the first one is still active is a conflict
         ResponseEntity<Map<String, Object>> conflict =
                 call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null);
         assertThat(conflict.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(conflict.getBody().get("code")).isEqualTo("ACTIVE_OPERATION_EXISTS");
 
-        // deleting the device while an operation is active is refused as well
         assertThat(call(HttpMethod.DELETE, "/api/v1/devices/" + deviceId, null, null).getStatusCode())
                 .isEqualTo(HttpStatus.CONFLICT);
 
@@ -215,7 +208,6 @@ class PingApiEndToEndTest {
         assertThat((String) result.get("errorMessage")).contains("timed out");
         assertThat(device(deviceId).get("lastStatus")).isEqualTo("UNKNOWN");
 
-        // the device is free again afterwards
         assertThat(call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null).getStatusCode())
                 .isEqualTo(HttpStatus.ACCEPTED);
     }
@@ -233,7 +225,6 @@ class PingApiEndToEndTest {
         assertThat((String) result.get("errorMessage")).contains("Simulated network error");
     }
 
-    // ---------- error handling ----------
 
     @Test
     void ping_onDisabledMonitoring_is422() {

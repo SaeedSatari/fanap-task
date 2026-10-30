@@ -1,25 +1,23 @@
 package com.network.ping;
 
 import com.network.config.NetworkProperties;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Component;
+
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Component;
+import java.util.concurrent.*;
 
-/** Executes one operation: claim, probe with timeout, then record success / retry / failure. */
+/**
+ * Executes one operation: claim, probe with timeout, then record success / retry / failure.
+ */
 @Component
+@Slf4j
 public class PingWorker {
 
-    private static final Logger log = LoggerFactory.getLogger(PingWorker.class);
 
     private final PingOperationStore store;
     private final PingProbe probe;
@@ -53,7 +51,6 @@ public class PingWorker {
         } catch (PingProbeException e) {
             onFailure(op, PingStatus.FAILED, e.getMessage());
         } catch (InterruptedException e) {
-            // Application shutting down: leave it RUNNING; lease expiry / startup recovery will resolve it.
             Thread.currentThread().interrupt();
             log.warn("Worker interrupted while processing {}; recovery will handle it", operationId);
         } catch (RuntimeException e) {
@@ -98,7 +95,6 @@ public class PingWorker {
         }
     }
 
-    /** Exponential backoff: base * 2^(attempt-1), capped. */
     Duration backoff(int attempt) {
         long factor = 1L << Math.min(Math.max(attempt - 1, 0), 10);
         long millis = props.getPing().getRetryBackoff().toMillis() * factor;

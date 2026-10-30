@@ -7,22 +7,20 @@ import com.network.ping.PingOperationRepository;
 import com.network.ping.PingOperationResponse;
 import java.util.ArrayList;
 import java.util.List;
+
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@RequiredArgsConstructor
 public class MonitorService {
 
     private static final int RECENT = 10;
 
     private final DeviceRepository devices;
     private final PingOperationRepository operations;
-
-    public MonitorService(DeviceRepository devices, PingOperationRepository operations) {
-        this.devices = devices;
-        this.operations = operations;
-    }
 
     @Transactional(readOnly = true)
     public MonitorSummaryResponse summarize(Long deviceId, int window) {

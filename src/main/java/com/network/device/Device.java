@@ -1,19 +1,17 @@
 package com.network.device;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.Instant;
 
 @Entity
 @Table(name = "devices",
         uniqueConstraints = @UniqueConstraint(name = "uk_devices_ip", columnNames = "ip_address"))
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Device {
 
     @Id
@@ -46,8 +44,6 @@ public class Device {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    protected Device() { }
-
     public Device(String name, String ipAddress, DeviceType type, boolean monitoringEnabled, Instant now) {
         this.name = name;
         this.ipAddress = ipAddress;
@@ -57,7 +53,6 @@ public class Device {
         this.updatedAt = now;
     }
 
-    /** Changing the address invalidates what we knew about connectivity. */
     public void updateDetails(String name, String ipAddress, DeviceType type, Instant now) {
         if (!this.ipAddress.equals(ipAddress)) {
             this.lastStatus = ConnectionStatus.UNKNOWN;
@@ -73,14 +68,4 @@ public class Device {
         this.monitoringEnabled = enabled;
         this.updatedAt = now;
     }
-
-    public Long getId() { return id; }
-    public String getName() { return name; }
-    public String getIpAddress() { return ipAddress; }
-    public DeviceType getType() { return type; }
-    public boolean isMonitoringEnabled() { return monitoringEnabled; }
-    public ConnectionStatus getLastStatus() { return lastStatus; }
-    public Instant getLastCheckedAt() { return lastCheckedAt; }
-    public Instant getCreatedAt() { return createdAt; }
-    public Instant getUpdatedAt() { return updatedAt; }
 }

@@ -1,11 +1,14 @@
 package com.network.ping;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import com.network.device.ConnectionStatus;
 import com.network.device.Device;
 import com.network.device.DeviceRepository;
 import com.network.device.DeviceType;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -13,17 +16,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import java.util.concurrent.*;
 
-/** State transitions, persistence of results, and recovery after a (simulated) restart. */
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * State transitions, persistence of results, and recovery after a (simulated) restart.
+ */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = {
         "network.recovery.enabled=false",
         "network.monitoring.enabled=false",
@@ -31,10 +30,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 })
 class PingOperationStoreIntegrationTest {
 
-    @Autowired DeviceRepository devices;
-    @Autowired PingOperationRepository operations;
-    @Autowired PingOperationStore store;
-    @Autowired Clock clock;
+    @Autowired
+    DeviceRepository devices;
+    @Autowired
+    PingOperationRepository operations;
+    @Autowired
+    PingOperationStore store;
+    @Autowired
+    Clock clock;
 
     Device device;
 
@@ -53,7 +56,9 @@ class PingOperationStoreIntegrationTest {
         return operations.findById(id).orElseThrow();
     }
 
-    /** Claim the operation, failing and re-queueing it until it is RUNNING on the given attempt number. */
+    /**
+     * Claim the operation, failing and re-queueing it until it is RUNNING on the given attempt number.
+     */
     private ClaimedOperation driveToRunning(UUID id, int attempt) {
         ClaimedOperation claimed = null;
         for (int i = 1; i <= attempt; i++) {
@@ -184,7 +189,6 @@ class PingOperationStoreIntegrationTest {
         ClaimedOperation secondAttempt = store.claim(op.getId()).orElseThrow();
         assertThat(secondAttempt.attempt()).isEqualTo(2);
 
-        // the "zombie" first worker finally reports back: it must be ignored
         assertThat(store.succeed(firstAttempt, new PingResult(true, 1L))).isFalse();
         assertThat(reload(op.getId()).getStatus()).isEqualTo(PingStatus.RUNNING);
 
@@ -195,21 +199,20 @@ class PingOperationStoreIntegrationTest {
     @Test
     void recovery_afterRestart_requeuesOrphanedOperations_andFailsExhaustedOnes() {
         PingOperation retryable = newOperation(3);
-        driveToRunning(retryable.getId(), 1);                  // attempt 1 of 3, then "process dies"
+        driveToRunning(retryable.getId(), 1);
 
         Device other = devices.save(new Device("radio", "10.1.1.2", DeviceType.RADIO, true, clock.instant()));
         PingOperation exhausted = operations.saveAndFlush(
                 new PingOperation(other.getId(), null, 2, clock.instant()));
-        driveToRunning(exhausted.getId(), 2);                  // attempt 2 of 2, then "process dies"
+        driveToRunning(exhausted.getId(), 2);
 
-        // On startup every RUNNING operation is orphaned (cutoff far in the future)
         int recovered = store.recoverStaleOperations(clock.instant().plus(Duration.ofDays(1)));
 
         assertThat(recovered).isEqualTo(2);
         PingOperation requeued = reload(retryable.getId());
         assertThat(requeued.getStatus()).isEqualTo(PingStatus.PENDING);
         assertThat(requeued.getErrorMessage()).contains("Interrupted");
-        assertThat(store.claim(retryable.getId())).isPresent();   // and it runs again as attempt 2
+        assertThat(store.claim(retryable.getId())).isPresent();
 
         PingOperation failed = reload(exhausted.getId());
         assertThat(failed.getStatus()).isEqualTo(PingStatus.FAILED);

@@ -4,12 +4,13 @@ import com.network.common.ApiException;
 import com.network.config.NetworkProperties;
 import com.network.device.Device;
 import com.network.device.DeviceRepository;
-import java.time.Clock;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.time.Clock;
 
 /**
  * Periodic monitoring: enqueues a ping for every device whose monitoring is enabled. The idempotency
@@ -18,22 +19,15 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(prefix = "network.monitoring", name = "enabled", havingValue = "true", matchIfMissing = true)
+@RequiredArgsConstructor
+@Slf4j
 public class MonitoringScheduler {
 
-    private static final Logger log = LoggerFactory.getLogger(MonitoringScheduler.class);
 
     private final DeviceRepository devices;
     private final PingSubmissionService submissionService;
     private final NetworkProperties props;
     private final Clock clock;
-
-    public MonitoringScheduler(DeviceRepository devices, PingSubmissionService submissionService,
-                               NetworkProperties props, Clock clock) {
-        this.devices = devices;
-        this.submissionService = submissionService;
-        this.props = props;
-        this.clock = clock;
-    }
 
     @Scheduled(initialDelayString = "${network.monitoring.interval-ms:30000}",
             fixedDelayString = "${network.monitoring.interval-ms:30000}")

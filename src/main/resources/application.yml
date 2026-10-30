@@ -14,6 +14,13 @@ spring:
     hibernate:
       ddl-auto: update
 
+springdoc:
+  paths-to-match: /api/**        # documents the public API, hides /internal/**
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
 network:
   ping:
     timeout: 3s              # max time a single (mock) ping may take

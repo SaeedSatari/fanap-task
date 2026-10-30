@@ -1,11 +1,13 @@
 package com.network.ping;
 
 import com.network.config.NetworkProperties;
-import java.util.concurrent.ThreadLocalRandom;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 /**
- * Simulated ping. Deterministic behaviour for documentation ranges (RFC 5737) so every
+ * Simulated ping. Deterministic behavior for documentation ranges so every
  * failure path can be demonstrated on demand:
  * <ul>
  *   <li>192.0.2.x    - host unreachable (conclusive DOWN)</li>
@@ -15,20 +17,17 @@ import org.springframework.stereotype.Component;
  * </ul>
  */
 @Component
+@RequiredArgsConstructor
 public class MockPingProbe implements PingProbe {
 
     private final NetworkProperties props;
-
-    public MockPingProbe(NetworkProperties props) {
-        this.props = props;
-    }
 
     @Override
     public PingResult ping(String ipAddress) throws PingProbeException {
         NetworkProperties.Mock mock = props.getMock();
 
         if (ipAddress.startsWith("198.51.100.")) {
-            sleep(10 * 60 * 1000L); // effectively "never answers"; interrupted by the worker's timeout
+            sleep(10 * 60 * 1000L);
             return new PingResult(false, null);
         }
         if (ipAddress.startsWith("203.0.113.")) {

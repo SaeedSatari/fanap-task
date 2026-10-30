@@ -79,7 +79,7 @@ class PingSubmissionConcurrencyTest {
 
     @BeforeEach
     void setUp() {
-        probe.open(); // let leftovers from a previous test finish
+        probe.open();
         await().atMost(Duration.ofSeconds(10)).until(() ->
                 operations.findAll().stream().noneMatch(o -> o.getStatus().ordinal() <= PingStatus.RUNNING.ordinal()));
         operations.deleteAll();

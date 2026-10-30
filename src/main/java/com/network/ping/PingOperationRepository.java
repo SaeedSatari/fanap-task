@@ -55,5 +55,5 @@ public interface PingOperationRepository extends JpaRepository<PingOperation, UU
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from PingOperation o where o.deviceId = :deviceId")
-    int deleteAllByDeviceId(@Param("deviceId") Long deviceId);
+    void deleteAllByDeviceId(@Param("deviceId") Long deviceId);
 }

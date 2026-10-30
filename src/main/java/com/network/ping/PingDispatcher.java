@@ -1,26 +1,26 @@
 package com.network.ping;
 
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
+
 /**
- * Hands operation ids to the bounded worker pool. Dispatching is only an optimisation: the database is
+ * Hands operation ids to the bounded worker pool. Dispatching is only an optimization: the database is
  * the source of truth and the recovery sweeper re-dispatches anything that is still PENDING and due.
  * Double dispatch is harmless because {@link PingOperationStore#claim} is an atomic compare-and-set.
  */
 @Component
+@Slf4j
 public class PingDispatcher {
 
-    private static final Logger log = LoggerFactory.getLogger(PingDispatcher.class);
 
     private final PingWorker worker;
     private final ExecutorService executor;
@@ -31,7 +31,6 @@ public class PingDispatcher {
         this.executor = executor;
     }
 
-    /** Dispatch once the surrounding transaction commits (so the worker can see the row). */
     public void dispatchAfterCommit(UUID operationId) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -47,7 +46,7 @@ public class PingDispatcher {
 
     public void dispatch(UUID operationId) {
         if (!inFlight.add(operationId)) {
-            return; // already queued or running in this instance
+            return;
         }
         try {
             executor.execute(() -> {

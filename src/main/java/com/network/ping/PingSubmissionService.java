@@ -4,13 +4,16 @@ import com.network.common.ApiException;
 import com.network.config.NetworkProperties;
 import com.network.device.Device;
 import com.network.device.DeviceRepository;
-import java.time.Clock;
-import java.util.List;
-import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.util.List;
+import java.util.Optional;
+
 @Service
+@RequiredArgsConstructor
 public class PingSubmissionService {
 
     static final List<PingStatus> ACTIVE = List.of(PingStatus.PENDING, PingStatus.RUNNING);
@@ -21,23 +24,6 @@ public class PingSubmissionService {
     private final NetworkProperties props;
     private final Clock clock;
 
-    public PingSubmissionService(DeviceRepository devices, PingOperationRepository operations,
-                                 PingDispatcher dispatcher, NetworkProperties props, Clock clock) {
-        this.devices = devices;
-        this.operations = operations;
-        this.dispatcher = dispatcher;
-        this.props = props;
-        this.clock = clock;
-    }
-
-    /**
-     * Accepts a ping request and returns immediately; the probe runs asynchronously.
-     * <ol>
-     *   <li>The device row is locked, so concurrent submissions for one device are serialised.</li>
-     *   <li>Same idempotency key => the original operation is returned (nothing is re-executed).</li>
-     *   <li>Monitoring disabled => 422. Another operation still active => 409.</li>
-     * </ol>
-     */
     @Transactional
     public SubmissionResult submit(Long deviceId, String idempotencyKey) {
         Device device = devices.findByIdForUpdate(deviceId)

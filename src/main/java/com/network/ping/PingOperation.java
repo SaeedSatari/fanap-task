@@ -1,21 +1,13 @@
 package com.network.ping;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-import jakarta.persistence.Version;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * One asynchronous ping request. All state transitions after creation are done with guarded
- * (compare-and-set) UPDATE statements in {@link PingOperationRepository}, never by mutating this entity.
- */
 @Entity
 @Table(name = "ping_operations",
         uniqueConstraints = @UniqueConstraint(name = "uk_ping_device_idempotency",
@@ -24,12 +16,15 @@ import java.util.UUID;
                 @Index(name = "idx_ping_status_next", columnList = "status,next_attempt_at"),
                 @Index(name = "idx_ping_device_created", columnList = "device_id,created_at")
         })
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PingOperation {
 
     @Id
     private UUID id;
 
     @Version
+    @Getter(AccessLevel.NONE)
     private Long version;
 
     @Column(name = "device_id", nullable = false)
@@ -71,8 +66,6 @@ public class PingOperation {
     @Column(name = "finished_at")
     private Instant finishedAt;
 
-    protected PingOperation() { }
-
     public PingOperation(Long deviceId, String idempotencyKey, int maxAttempts, Instant now) {
         this.id = UUID.randomUUID();
         this.deviceId = deviceId;
@@ -83,19 +76,4 @@ public class PingOperation {
         this.nextAttemptAt = now;
         this.createdAt = now;
     }
-
-    public UUID getId() { return id; }
-    public Long getDeviceId() { return deviceId; }
-    public String getIdempotencyKey() { return idempotencyKey; }
-    public PingStatus getStatus() { return status; }
-    public int getAttempts() { return attempts; }
-    public int getMaxAttempts() { return maxAttempts; }
-    public Instant getNextAttemptAt() { return nextAttemptAt; }
-    public Instant getLeaseExpiresAt() { return leaseExpiresAt; }
-    public Boolean getReachable() { return reachable; }
-    public Long getResponseTimeMs() { return responseTimeMs; }
-    public String getErrorMessage() { return errorMessage; }
-    public Instant getCreatedAt() { return createdAt; }
-    public Instant getStartedAt() { return startedAt; }
-    public Instant getFinishedAt() { return finishedAt; }
 }
