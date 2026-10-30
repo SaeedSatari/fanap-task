@@ -7,24 +7,22 @@ services:
     volumes:
       - network-data:/app/data
     healthcheck:
-      test: ["CMD", "curl", "-fs", "http://localhost:8080/api/v1/devices?size=1"]
+      test: [ "CMD", "curl", "-fs", "http://localhost:8080/api/v1/devices?size=1" ]
       interval: 5s
       timeout: 3s
       retries: 20
       start_period: 15s
     restart: unless-stopped
 
-  # docker compose --profile test run --rm smoke
-  # از همان ایمیج برنامه استفاده می‌کند (bash و curl دارد)، پس چیزی دانلود نمی‌شود.
   smoke:
-    profiles: ["test"]
+    profiles: [ "test" ]
     image: network:local
     depends_on:
       network:
         condition: service_healthy
     volumes:
       - ./smoke-test.sh:/smoke-test.sh:ro
-    entrypoint: ["bash", "/smoke-test.sh", "http://network:8080"]
+    entrypoint: [ "bash", "/smoke-test.sh", "http://network:8080" ]
 
 volumes:
   network-data:
