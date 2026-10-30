@@ -1,0 +1,49 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: netmon
+  datasource:
+    # File-based H2 so that data (and in-flight operations) survive an application restart.
+    url: jdbc:h2:file:./data/netmon;LOCK_TIMEOUT=10000
+    username: sa
+    password: ""
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+
+netmon:
+  ping:
+    timeout: 3s              # max time a single (mock) ping may take
+    max-attempts: 3          # 1 initial attempt + 2 retries
+    retry-backoff: 1s        # exponential: 1s, 2s, 4s ... (capped by max-retry-backoff)
+    max-retry-backoff: 30s
+    lease-margin: 5s         # RUNNING lease = timeout + margin; expired lease => operation is recovered
+  worker:
+    threads: 4
+    queue-capacity: 100
+  recovery:
+    enabled: true
+    sweep-interval-ms: 1000
+    requeue-running-on-startup: true   # single-instance assumption: anything RUNNING at boot is orphaned
+    dispatch-batch-size: 50
+  monitoring:
+    enabled: true            # periodically ping every device whose monitoring is enabled
+    interval-ms: 30000
+  clients:
+    retries: 1               # extra attempts for idempotent GET calls only (never for POST)
+    ping:
+      base-url: ""           # empty => this application itself (monolith); set to split the service out
+      connect-timeout: 1s
+      read-timeout: 3s
+    monitor:
+      base-url: ""
+      connect-timeout: 1s
+      read-timeout: 3s
+  mock:
+    reachable-probability: 0.85
+    min-latency-ms: 20
+    max-latency-ms: 250
+    transient-error-probability: 0.05

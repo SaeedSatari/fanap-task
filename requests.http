@@ -1,0 +1,46 @@
+### Create a device
+POST http://localhost:8080/api/v1/devices
+Content-Type: application/json
+
+{ "name": "Modem Muscat-01", "ipAddress": "10.0.0.11", "type": "MODEM", "monitoringEnabled": true }
+
+### List devices
+GET http://localhost:8080/api/v1/devices?page=0&size=20
+
+### Get / update / delete
+GET http://localhost:8080/api/v1/devices/1
+
+###
+PUT http://localhost:8080/api/v1/devices/1
+Content-Type: application/json
+
+{ "name": "Modem Muscat-01 (renamed)", "ipAddress": "10.0.0.11", "type": "MODEM" }
+
+###
+DELETE http://localhost:8080/api/v1/devices/1
+
+### Enable / disable monitoring
+PUT http://localhost:8080/api/v1/devices/1/monitoring
+Content-Type: application/json
+
+{ "enabled": false }
+
+### Request an async ping (202 + operation). Repeat with the same key => 200 + same operation, no new ping
+POST http://localhost:8080/api/v1/devices/1/pings
+Idempotency-Key: demo-0001
+
+### Poll an operation (use the id from the previous response)
+GET http://localhost:8080/api/v1/pings/{{operationId}}
+
+### Ping history of a device
+GET http://localhost:8080/api/v1/devices/1/pings?limit=20
+
+### Monitoring summary (availability, latency stats, recent operations)
+GET http://localhost:8080/api/v1/devices/1/monitor?window=50
+
+### --- Failure demos (mock probe behaviour by IP range) ---
+### 192.0.2.x -> device DOWN (conclusive)   198.51.100.x -> probe hangs => TIMED_OUT   203.0.113.x -> probe error => FAILED
+POST http://localhost:8080/api/v1/devices
+Content-Type: application/json
+
+{ "name": "hangs", "ipAddress": "198.51.100.7", "type": "RADIO" }
