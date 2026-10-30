@@ -1,21 +1,19 @@
 package com.network.ping;
 
 import com.network.config.NetworkProperties;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Guarantees no operation stays in an undefined state:
@@ -29,7 +27,6 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(prefix = "network.recovery", name = "enabled", havingValue = "true", matchIfMissing = true)
 @Slf4j
 public class PingRecoveryScheduler {
-
 
     private final PingOperationStore store;
     private final PingOperationRepository operations;

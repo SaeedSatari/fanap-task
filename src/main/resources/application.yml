@@ -5,7 +5,6 @@ spring:
   application:
     name: network
   datasource:
-    # File-based H2 so that data (and in-flight operations) survive an application restart.
     url: jdbc:h2:file:./data/network;LOCK_TIMEOUT=10000
     username: sa
     password: ""
@@ -15,7 +14,7 @@ spring:
       ddl-auto: update
 
 springdoc:
-  paths-to-match: /api/**        # documents the public API, hides /internal/**
+  paths-to-match: /api/**
   swagger-ui:
     path: /swagger-ui.html
     operations-sorter: method
@@ -23,26 +22,26 @@ springdoc:
 
 network:
   ping:
-    timeout: 3s              # max time a single (mock) ping may take
-    max-attempts: 3          # 1 initial attempt + 2 retries
-    retry-backoff: 1s        # exponential: 1s, 2s, 4s ... (capped by max-retry-backoff)
+    timeout: 3s
+    max-attempts: 3
+    retry-backoff: 1s
     max-retry-backoff: 30s
-    lease-margin: 5s         # RUNNING lease = timeout + margin; expired lease => operation is recovered
+    lease-margin: 5s
   worker:
     threads: 4
     queue-capacity: 100
   recovery:
     enabled: true
     sweep-interval-ms: 1000
-    requeue-running-on-startup: true   # single-instance assumption: anything RUNNING at boot is orphaned
+    requeue-running-on-startup: true
     dispatch-batch-size: 50
   monitoring:
-    enabled: true            # periodically ping every device whose monitoring is enabled
+    enabled: true
     interval-ms: 30000
   clients:
-    retries: 1               # extra attempts for idempotent GET calls only (never for POST)
+    retries: 1
     ping:
-      base-url: ""           # empty => this application itself (monolith); set to split the service out
+      base-url: ""
       connect-timeout: 1s
       read-timeout: 3s
     monitor:

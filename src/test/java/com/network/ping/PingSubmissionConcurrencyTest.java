@@ -1,26 +1,9 @@
 package com.network.ping;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
-
 import com.network.common.ApiException;
 import com.network.device.Device;
 import com.network.device.DeviceRepository;
 import com.network.device.DeviceType;
-import java.time.Clock;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,7 +13,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
 
-/** Duplicate and concurrent requests for the same device, with a probe the test can hold open. */
+import java.time.Clock;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = {
         "network.recovery.enabled=false",
         "network.monitoring.enabled=false",
@@ -40,14 +31,22 @@ import org.springframework.data.domain.PageRequest;
 })
 class PingSubmissionConcurrencyTest {
 
-    /** Probe that blocks until the test opens the gate; counts how often it really ran. */
     static class GatedProbe implements PingProbe {
         private volatile CountDownLatch gate = new CountDownLatch(1);
         private final AtomicInteger calls = new AtomicInteger();
 
-        void close() { gate = new CountDownLatch(1); calls.set(0); }
-        void open() { gate.countDown(); }
-        int calls() { return calls.get(); }
+        void close() {
+            gate = new CountDownLatch(1);
+            calls.set(0);
+        }
+
+        void open() {
+            gate.countDown();
+        }
+
+        int calls() {
+            return calls.get();
+        }
 
         @Override
         public PingResult ping(String ipAddress) throws PingProbeException {
@@ -71,11 +70,16 @@ class PingSubmissionConcurrencyTest {
         }
     }
 
-    @Autowired GatedProbe probe;
-    @Autowired PingSubmissionService submission;
-    @Autowired PingOperationRepository operations;
-    @Autowired DeviceRepository devices;
-    @Autowired Clock clock;
+    @Autowired
+    GatedProbe probe;
+    @Autowired
+    PingSubmissionService submission;
+    @Autowired
+    PingOperationRepository operations;
+    @Autowired
+    DeviceRepository devices;
+    @Autowired
+    Clock clock;
 
     @BeforeEach
     void setUp() {
@@ -91,11 +95,11 @@ class PingSubmissionConcurrencyTest {
         return devices.save(new Device("d-" + ip, ip, DeviceType.MODEM, monitoring, clock.instant()));
     }
 
-    private List<Object> runConcurrently(int threads, Callable<Object> task) throws Exception {
-        ExecutorService pool = Executors.newFixedThreadPool(threads);
+    private List<Object> runConcurrently(Callable<Object> task) throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(8);
         CountDownLatch start = new CountDownLatch(1);
         List<Future<Object>> futures = new ArrayList<>();
-        for (int i = 0; i < threads; i++) {
+        for (int i = 0; i < 8; i++) {
             futures.add(pool.submit(() -> {
                 start.await();
                 try {
@@ -114,16 +118,16 @@ class PingSubmissionConcurrencyTest {
         return results;
     }
 
-    private void awaitStatus(UUID id, PingStatus expected) {
+    private void awaitStatus(UUID id) {
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
-                assertThat(operations.findById(id).orElseThrow().getStatus()).isEqualTo(expected));
+                assertThat(operations.findById(id).orElseThrow().getStatus()).isEqualTo(PingStatus.SUCCEEDED));
     }
 
     @Test
     void concurrentRequests_forOneDevice_onlyOneOperationRuns() throws Exception {
         Device device = newDevice("10.20.0.1", true);
 
-        List<Object> results = runConcurrently(8, () -> submission.submit(device.getId(), null));
+        List<Object> results = runConcurrently(() -> submission.submit(device.getId(), null));
 
         List<SubmissionResult> accepted = results.stream()
                 .filter(SubmissionResult.class::isInstance).map(SubmissionResult.class::cast).toList();
@@ -137,7 +141,7 @@ class PingSubmissionConcurrencyTest {
         assertThat(operations.findByDeviceIdOrderByCreatedAtDesc(device.getId(), PageRequest.of(0, 50))).hasSize(1);
 
         probe.open();
-        awaitStatus(accepted.get(0).operation().getId(), PingStatus.SUCCEEDED);
+        awaitStatus(accepted.get(0).operation().getId());
         assertThat(probe.calls()).isEqualTo(1);
     }
 
@@ -145,7 +149,7 @@ class PingSubmissionConcurrencyTest {
     void concurrentRequests_withTheSameIdempotencyKey_shareOneOperation() throws Exception {
         Device device = newDevice("10.20.0.2", true);
 
-        List<Object> results = runConcurrently(8, () -> submission.submit(device.getId(), "key-1"));
+        List<Object> results = runConcurrently(() -> submission.submit(device.getId(), "key-1"));
 
         List<SubmissionResult> all = results.stream().map(SubmissionResult.class::cast).toList();
         Set<UUID> ids = new HashSet<>();
@@ -155,7 +159,7 @@ class PingSubmissionConcurrencyTest {
         assertThat(operations.findByDeviceIdOrderByCreatedAtDesc(device.getId(), PageRequest.of(0, 50))).hasSize(1);
 
         probe.open();
-        awaitStatus(ids.iterator().next(), PingStatus.SUCCEEDED);
+        awaitStatus(ids.iterator().next());
         assertThat(probe.calls()).isEqualTo(1);
     }
 
@@ -165,7 +169,7 @@ class PingSubmissionConcurrencyTest {
         probe.open();
 
         SubmissionResult first = submission.submit(device.getId(), "key-2");
-        awaitStatus(first.operation().getId(), PingStatus.SUCCEEDED);
+        awaitStatus(first.operation().getId());
         SubmissionResult replay = submission.submit(device.getId(), "key-2");
 
         assertThat(first.created()).isTrue();
@@ -176,7 +180,7 @@ class PingSubmissionConcurrencyTest {
     }
 
     @Test
-    void differentDevices_doNotBlockEachOther() throws Exception {
+    void differentDevices_doNotBlockEachOther() {
         Device a = newDevice("10.20.0.4", true);
         Device b = newDevice("10.20.0.5", true);
 
@@ -186,8 +190,8 @@ class PingSubmissionConcurrencyTest {
         assertThat(first.created()).isTrue();
         assertThat(second.created()).isTrue();
         probe.open();
-        awaitStatus(first.operation().getId(), PingStatus.SUCCEEDED);
-        awaitStatus(second.operation().getId(), PingStatus.SUCCEEDED);
+        awaitStatus(first.operation().getId());
+        awaitStatus(second.operation().getId());
     }
 
     @Test

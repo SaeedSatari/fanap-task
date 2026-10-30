@@ -4,19 +4,16 @@ import com.network.config.NetworkProperties;
 import com.network.device.ConnectionStatus;
 import com.network.device.Device;
 import com.network.device.DeviceRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-/** Every state transition of an operation (and the matching device update) is one short transaction. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -29,7 +26,9 @@ public class PingOperationStore {
     private final NetworkProperties props;
     private final Clock clock;
 
-    /** PENDING -> RUNNING with a lease. Empty when someone else already claimed it (or it is not due yet). */
+    /**
+     * PENDING -> RUNNING with a lease. Empty when someone else already claimed it (or it is not due yet).
+     */
     @Transactional
     public Optional<ClaimedOperation> claim(UUID id) {
         Instant now = clock.instant();
@@ -47,7 +46,9 @@ public class PingOperationStore {
                 op.getAttempts(), op.getMaxAttempts()));
     }
 
-    /** RUNNING -> SUCCEEDED and update the device's last status. */
+    /**
+     * RUNNING -> SUCCEEDED and update the device's last status.
+     */
     @Transactional
     public boolean succeed(ClaimedOperation op, PingResult result) {
         Instant now = clock.instant();
@@ -62,13 +63,17 @@ public class PingOperationStore {
         return true;
     }
 
-    /** RUNNING -> PENDING, to be picked up again at {@code nextAttemptAt}. */
+    /**
+     * RUNNING -> PENDING, to be picked up again at {@code nextAttemptAt}.
+     */
     @Transactional
-    public boolean retryLater(ClaimedOperation op, String error, Instant nextAttemptAt) {
-        return operations.requeue(op.id(), op.attempt(), nextAttemptAt, truncate(error)) == 1;
+    public void retryLater(ClaimedOperation op, String error, Instant nextAttemptAt) {
+        operations.requeue(op.id(), op.attempt(), nextAttemptAt, truncate(error));
     }
 
-    /** RUNNING -> FAILED / TIMED_OUT (no attempts left). The device status becomes UNKNOWN (inconclusive). */
+    /**
+     * RUNNING -> FAILED / TIMED_OUT (no attempts left). The device status becomes UNKNOWN (inconclusive).
+     */
     @Transactional
     public boolean fail(ClaimedOperation op, PingStatus terminalStatus, String error) {
         if (terminalStatus != PingStatus.FAILED && terminalStatus != PingStatus.TIMED_OUT) {

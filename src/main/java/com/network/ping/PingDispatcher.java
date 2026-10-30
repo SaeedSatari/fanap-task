@@ -12,11 +12,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 
-/**
- * Hands operation ids to the bounded worker pool. Dispatching is only an optimization: the database is
- * the source of truth and the recovery sweeper re-dispatches anything that is still PENDING and due.
- * Double dispatch is harmless because {@link PingOperationStore#claim} is an atomic compare-and-set.
- */
 @Component
 @Slf4j
 public class PingDispatcher {

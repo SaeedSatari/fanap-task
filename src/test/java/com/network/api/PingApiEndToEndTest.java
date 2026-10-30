@@ -1,28 +1,21 @@
 package com.network.api;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
-
-import java.time.Duration;
-import java.util.List;
-import java.util.Map;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 
-/**
- * Full stack over real HTTP: public API -> RestTemplate -> internal services -> async worker -> H2.
- * The mock probe is made fast and deterministic; the 192.0.2.x / 198.51.100.x / 203.0.113.x ranges
- * trigger the "down", "hangs" and "errors" paths.
- */
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "network.monitoring.enabled=false",
         "network.ping.timeout=300ms",
@@ -37,10 +30,13 @@ import org.springframework.http.ResponseEntity;
 })
 class PingApiEndToEndTest {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP = new ParameterizedTypeReference<>() { };
-    private static final ParameterizedTypeReference<List<Map<String, Object>>> LIST = new ParameterizedTypeReference<>() { };
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP = new ParameterizedTypeReference<>() {
+    };
+    private static final ParameterizedTypeReference<List<Map<String, Object>>> LIST = new ParameterizedTypeReference<>() {
+    };
 
-    @Autowired TestRestTemplate rest;
+    @Autowired
+    TestRestTemplate rest;
 
 
     private ResponseEntity<Map<String, Object>> call(HttpMethod method, String url, Object body, String idempotencyKey) {
@@ -60,12 +56,13 @@ class PingApiEndToEndTest {
         ResponseEntity<Map<String, Object>> response = call(HttpMethod.POST, "/api/v1/devices",
                 Map.of("name", "dev-" + ip, "ipAddress", ip, "type", "MODEM", "monitoringEnabled", monitoring), null);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        Assertions.assertNotNull(response.getBody());
         return ((Number) response.getBody().get("id")).longValue();
     }
 
     private Map<String, Object> awaitFinalState(String operationId) {
         await().atMost(Duration.ofSeconds(15)).until(() -> {
-            String status = (String) call(HttpMethod.GET, "/api/v1/pings/" + operationId, null, null).getBody().get("status");
+            String status = (String) Objects.requireNonNull(call(HttpMethod.GET, "/api/v1/pings/" + operationId, null, null).getBody()).get("status");
             return !status.equals("PENDING") && !status.equals("RUNNING");
         });
         return call(HttpMethod.GET, "/api/v1/pings/" + operationId, null, null).getBody();
@@ -82,6 +79,7 @@ class PingApiEndToEndTest {
                 Map.of("name", "", "ipAddress", "999.1.1.1", "type", "MODEM"), null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        Assertions.assertNotNull(response.getBody());
         assertThat(response.getBody().get("code")).isEqualTo("VALIDATION_ERROR");
         @SuppressWarnings("unchecked")
         Map<String, String> details = (Map<String, String>) response.getBody().get("details");
@@ -93,6 +91,7 @@ class PingApiEndToEndTest {
         ResponseEntity<Map<String, Object>> badType = call(HttpMethod.POST, "/api/v1/devices",
                 Map.of("name", "x", "ipAddress", "10.9.9.1", "type", "TOASTER"), null);
         assertThat(badType.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        Assertions.assertNotNull(badType.getBody());
         assertThat(badType.getBody().get("code")).isEqualTo("MALFORMED_REQUEST");
 
         ResponseEntity<Map<String, Object>> badJson = call(HttpMethod.POST, "/api/v1/devices", "{oops", null);
@@ -110,15 +109,18 @@ class PingApiEndToEndTest {
         ResponseEntity<Map<String, Object>> duplicate = call(HttpMethod.POST, "/api/v1/devices",
                 Map.of("name", "other", "ipAddress", "10.9.0.1", "type", "RADIO"), null);
         assertThat(duplicate.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        Assertions.assertNotNull(duplicate.getBody());
         assertThat(duplicate.getBody().get("code")).isEqualTo("DUPLICATE_IP");
 
         ResponseEntity<Map<String, Object>> updated = call(HttpMethod.PUT, "/api/v1/devices/" + id,
                 Map.of("name", "renamed", "ipAddress", "10.9.0.1", "type", "RADIO"), null);
         assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
+        Assertions.assertNotNull(updated.getBody());
         assertThat(updated.getBody().get("name")).isEqualTo("renamed");
 
         ResponseEntity<Map<String, Object>> toggled = call(HttpMethod.PUT, "/api/v1/devices/" + id + "/monitoring",
                 Map.of("enabled", false), null);
+        Assertions.assertNotNull(toggled.getBody());
         assertThat(toggled.getBody().get("monitoringEnabled")).isEqualTo(false);
 
         assertThat(call(HttpMethod.DELETE, "/api/v1/devices/" + id, null, null).getStatusCode())
@@ -144,12 +146,14 @@ class PingApiEndToEndTest {
                 call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, "req-1");
         assertThat(accepted.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         assertThat(accepted.getHeaders().getLocation()).isNotNull();
+        Assertions.assertNotNull(accepted.getBody());
         String operationId = (String) accepted.getBody().get("id");
 
         ResponseEntity<Map<String, Object>> replay =
                 call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, "req-1");
         assertThat(replay.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(replay.getHeaders().getFirst("Idempotent-Replayed")).isEqualTo("true");
+        Assertions.assertNotNull(replay.getBody());
         assertThat(replay.getBody().get("id")).isEqualTo(operationId);
 
         Map<String, Object> result = awaitFinalState(operationId);
@@ -169,6 +173,7 @@ class PingApiEndToEndTest {
         assertThat(history.getBody()).hasSize(1);
 
         Map<String, Object> monitor = call(HttpMethod.GET, "/api/v1/devices/" + deviceId + "/monitor", null, null).getBody();
+        Assertions.assertNotNull(monitor);
         assertThat(((Number) monitor.get("totalOperations")).intValue()).isEqualTo(1);
         assertThat(((Number) monitor.get("availabilityPercent")).doubleValue()).isEqualTo(100.0);
         assertThat(monitor.get("lastStatus")).isEqualTo("UP");
@@ -178,8 +183,8 @@ class PingApiEndToEndTest {
     void unreachableDevice_isASuccessfulOperation_withDownStatus() {
         long deviceId = createDevice("192.0.2.10");
 
-        String operationId = (String) call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null)
-                .getBody().get("id");
+        String operationId = (String) Objects.requireNonNull(call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null)
+                .getBody()).get("id");
         Map<String, Object> result = awaitFinalState(operationId);
 
         assertThat(result.get("status")).isEqualTo("SUCCEEDED");
@@ -191,12 +196,13 @@ class PingApiEndToEndTest {
     void hangingProbe_timesOut_retries_thenEndsTimedOut_andBlocksConcurrentRequests() {
         long deviceId = createDevice("198.51.100.7");
 
-        String operationId = (String) call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null)
-                .getBody().get("id");
+        String operationId = (String) Objects.requireNonNull(call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null)
+                .getBody()).get("id");
 
         ResponseEntity<Map<String, Object>> conflict =
                 call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null);
         assertThat(conflict.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        Assertions.assertNotNull(conflict.getBody());
         assertThat(conflict.getBody().get("code")).isEqualTo("ACTIVE_OPERATION_EXISTS");
 
         assertThat(call(HttpMethod.DELETE, "/api/v1/devices/" + deviceId, null, null).getStatusCode())
@@ -216,8 +222,8 @@ class PingApiEndToEndTest {
     void failingProbe_isRetried_thenEndsFailed() {
         long deviceId = createDevice("203.0.113.5");
 
-        String operationId = (String) call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null)
-                .getBody().get("id");
+        String operationId = (String) Objects.requireNonNull(call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null)
+                .getBody()).get("id");
         Map<String, Object> result = awaitFinalState(operationId);
 
         assertThat(result.get("status")).isEqualTo("FAILED");
@@ -234,6 +240,7 @@ class PingApiEndToEndTest {
                 call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+        Assertions.assertNotNull(response.getBody());
         assertThat(response.getBody().get("code")).isEqualTo("MONITORING_DISABLED");
     }
 
@@ -241,6 +248,7 @@ class PingApiEndToEndTest {
     void unknownResources_areReportedAs404_throughTheDownstreamServices() {
         ResponseEntity<Map<String, Object>> ping = call(HttpMethod.POST, "/api/v1/devices/987654/pings", null, null);
         assertThat(ping.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        Assertions.assertNotNull(ping.getBody());
         assertThat(ping.getBody().get("code")).isEqualTo("DEVICE_NOT_FOUND");
 
         ResponseEntity<Map<String, Object>> monitor = call(HttpMethod.GET, "/api/v1/devices/987654/monitor", null, null);
@@ -249,6 +257,7 @@ class PingApiEndToEndTest {
         ResponseEntity<Map<String, Object>> operation = call(HttpMethod.GET,
                 "/api/v1/pings/7c9e6679-7425-40de-944b-e07fc1f90ae7", null, null);
         assertThat(operation.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        Assertions.assertNotNull(operation.getBody());
         assertThat(operation.getBody().get("code")).isEqualTo("OPERATION_NOT_FOUND");
     }
 
@@ -259,6 +268,7 @@ class PingApiEndToEndTest {
         ResponseEntity<Map<String, Object>> badKey =
                 call(HttpMethod.POST, "/api/v1/devices/" + deviceId + "/pings", null, "not a valid key!");
         assertThat(badKey.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        Assertions.assertNotNull(badKey.getBody());
         assertThat(badKey.getBody().get("code")).isEqualTo("INVALID_IDEMPOTENCY_KEY");
 
         assertThat(call(HttpMethod.GET, "/api/v1/pings/not-a-uuid", null, null).getStatusCode())

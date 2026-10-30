@@ -1,19 +1,7 @@
 package com.network.device;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import com.network.common.ApiException;
 import com.network.ping.PingOperationRepository;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,13 +9,26 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 @ExtendWith(MockitoExtension.class)
 class DeviceServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
 
-    @Mock DeviceRepository devices;
-    @Mock PingOperationRepository operations;
+    @Mock
+    DeviceRepository devices;
+    @Mock
+    PingOperationRepository operations;
 
     DeviceService service;
 
@@ -36,9 +37,9 @@ class DeviceServiceTest {
         service = new DeviceService(devices, operations, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
-    private Device existing(long id, String ip) {
-        Device device = new Device("Modem", ip, DeviceType.MODEM, true, NOW);
-        ReflectionTestUtils.setField(device, "id", id);
+    private Device existing() {
+        Device device = new Device("Modem", "10.0.0.1", DeviceType.MODEM, true, NOW);
+        ReflectionTestUtils.setField(device, "id", 1L);
         return device;
     }
 
@@ -81,7 +82,7 @@ class DeviceServiceTest {
 
     @Test
     void update_toIpOfAnotherDevice_isRejected() {
-        when(devices.findById(1L)).thenReturn(Optional.of(existing(1L, "10.0.0.1")));
+        when(devices.findById(1L)).thenReturn(Optional.of(existing()));
         when(devices.existsByIpAddressAndIdNot("10.0.0.2", 1L)).thenReturn(true);
 
         assertThatThrownBy(() -> service.update(1L, new UpdateDeviceRequest("X", "10.0.0.2", DeviceType.MODEM)))
@@ -90,7 +91,7 @@ class DeviceServiceTest {
 
     @Test
     void update_changingIp_resetsConnectivityKnowledge() {
-        Device device = existing(1L, "10.0.0.1");
+        Device device = existing();
         ReflectionTestUtils.setField(device, "lastStatus", ConnectionStatus.UP);
         ReflectionTestUtils.setField(device, "lastCheckedAt", NOW);
         when(devices.findById(1L)).thenReturn(Optional.of(device));
@@ -107,7 +108,7 @@ class DeviceServiceTest {
 
     @Test
     void setMonitoring_togglesFlag() {
-        Device device = existing(1L, "10.0.0.1");
+        Device device = existing();
         when(devices.findById(1L)).thenReturn(Optional.of(device));
         when(devices.save(device)).thenReturn(device);
 
@@ -117,7 +118,7 @@ class DeviceServiceTest {
 
     @Test
     void delete_whileOperationIsActive_isRejected() {
-        Device device = existing(1L, "10.0.0.1");
+        Device device = existing();
         when(devices.findByIdForUpdate(1L)).thenReturn(Optional.of(device));
         when(operations.existsByDeviceIdAndStatusIn(eq(1L), any())).thenReturn(true);
 
@@ -131,7 +132,7 @@ class DeviceServiceTest {
 
     @Test
     void delete_removesHistoryAndDevice() {
-        Device device = existing(1L, "10.0.0.1");
+        Device device = existing();
         when(devices.findByIdForUpdate(1L)).thenReturn(Optional.of(device));
         when(operations.existsByDeviceIdAndStatusIn(eq(1L), any())).thenReturn(false);
 

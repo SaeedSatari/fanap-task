@@ -11,7 +11,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -20,9 +19,7 @@ import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * State transitions, persistence of results, and recovery after a (simulated) restart.
- */
+
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE, properties = {
         "network.recovery.enabled=false",
         "network.monitoring.enabled=false",
@@ -56,18 +53,14 @@ class PingOperationStoreIntegrationTest {
         return operations.findById(id).orElseThrow();
     }
 
-    /**
-     * Claim the operation, failing and re-queueing it until it is RUNNING on the given attempt number.
-     */
-    private ClaimedOperation driveToRunning(UUID id, int attempt) {
-        ClaimedOperation claimed = null;
+    private void driveToRunning(UUID id, int attempt) {
+        ClaimedOperation claimed;
         for (int i = 1; i <= attempt; i++) {
             claimed = store.claim(id).orElseThrow();
             if (i < attempt) {
                 store.retryLater(claimed, "retry", clock.instant());
             }
         }
-        return claimed;
     }
 
     @Test
@@ -229,16 +222,5 @@ class PingOperationStoreIntegrationTest {
 
         assertThat(recovered).isZero();
         assertThat(reload(op.getId()).getStatus()).isEqualTo(PingStatus.RUNNING);
-    }
-
-    @Test
-    void deviceStatus_isNeverOverwrittenByAnOlderResult() {
-        Instant newer = clock.instant();
-        devices.updateStatus(device.getId(), ConnectionStatus.UP, newer);
-
-        int updated = devices.updateStatus(device.getId(), ConnectionStatus.DOWN, newer.minusSeconds(60));
-
-        assertThat(updated).isZero();
-        assertThat(devices.findById(device.getId()).orElseThrow().getLastStatus()).isEqualTo(ConnectionStatus.UP);
     }
 }

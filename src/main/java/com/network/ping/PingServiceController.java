@@ -1,17 +1,12 @@
 package com.network.ping;
 
 import com.network.common.ApiException;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
 
 /**
  * "Ping service" (service #1). Internal contract; it is called over HTTP by {@code PingServiceClient}
@@ -32,7 +27,9 @@ public class PingServiceController {
         this.queryService = queryService;
     }
 
-    /** 202 = new operation accepted; 200 + Idempotent-Replayed header = earlier request replayed. */
+    /**
+     * 202 = new operation accepted; 200 + Idempotent-Replayed header = earlier request replayed.
+     */
     @PostMapping("/devices/{deviceId}/pings")
     public ResponseEntity<PingOperationResponse> submit(
             @PathVariable Long deviceId,

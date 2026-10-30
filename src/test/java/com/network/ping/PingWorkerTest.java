@@ -1,14 +1,13 @@
 package com.network.ping;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-
 import com.network.config.NetworkProperties;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -17,20 +16,21 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PingWorkerTest {
 
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
 
-    @Mock PingOperationStore store;
-    @Mock PingProbe probe;
+    @Mock
+    PingOperationStore store;
+    @Mock
+    PingProbe probe;
 
     final ExecutorService probeExecutor = Executors.newCachedThreadPool();
     final NetworkProperties props = new NetworkProperties();
@@ -50,13 +50,13 @@ class PingWorkerTest {
         probeExecutor.shutdownNow();
     }
 
-    private ClaimedOperation claimed(int attempt, int max) {
-        return new ClaimedOperation(id, 1L, "10.0.0.1", attempt, max);
+    private ClaimedOperation claimed(int attempt) {
+        return new ClaimedOperation(id, 1L, "10.0.0.1", attempt, 3);
     }
 
     @Test
     void successfulProbe_isRecordedAsSucceeded() throws Exception {
-        ClaimedOperation op = claimed(1, 3);
+        ClaimedOperation op = claimed(1);
         when(store.claim(id)).thenReturn(Optional.of(op));
         when(probe.ping("10.0.0.1")).thenReturn(new PingResult(true, 42L));
 
@@ -69,7 +69,7 @@ class PingWorkerTest {
 
     @Test
     void unreachableDevice_isStillASuccessfulOperation() throws Exception {
-        ClaimedOperation op = claimed(1, 3);
+        ClaimedOperation op = claimed(1);
         when(store.claim(id)).thenReturn(Optional.of(op));
         when(probe.ping("10.0.0.1")).thenReturn(new PingResult(false, null));
 
@@ -90,7 +90,7 @@ class PingWorkerTest {
 
     @Test
     void probeError_withAttemptsLeft_isRetriedWithExponentialBackoff() throws Exception {
-        ClaimedOperation op = claimed(2, 3);
+        ClaimedOperation op = claimed(2);
         when(store.claim(id)).thenReturn(Optional.of(op));
         when(probe.ping(any())).thenThrow(new PingProbeException("boom"));
 
@@ -103,7 +103,7 @@ class PingWorkerTest {
 
     @Test
     void probeError_onLastAttempt_failsTheOperation() throws Exception {
-        ClaimedOperation op = claimed(3, 3);
+        ClaimedOperation op = claimed(3);
         when(store.claim(id)).thenReturn(Optional.of(op));
         when(probe.ping(any())).thenThrow(new PingProbeException("boom"));
 
@@ -115,7 +115,7 @@ class PingWorkerTest {
 
     @Test
     void slowProbe_timesOut_andIsRetriedWhenAttemptsRemain() throws Exception {
-        ClaimedOperation op = claimed(1, 3);
+        ClaimedOperation op = claimed(1);
         when(store.claim(id)).thenReturn(Optional.of(op));
         when(probe.ping(any())).thenAnswer(inv -> {
             Thread.sleep(5_000);
@@ -130,7 +130,7 @@ class PingWorkerTest {
 
     @Test
     void slowProbe_onLastAttempt_endsAsTimedOut() throws Exception {
-        ClaimedOperation op = claimed(3, 3);
+        ClaimedOperation op = claimed(3);
         when(store.claim(id)).thenReturn(Optional.of(op));
         when(probe.ping(any())).thenAnswer(inv -> {
             Thread.sleep(5_000);
@@ -144,7 +144,7 @@ class PingWorkerTest {
 
     @Test
     void unexpectedRuntimeError_isTreatedAsAFailedAttempt() throws Exception {
-        ClaimedOperation op = claimed(3, 3);
+        ClaimedOperation op = claimed(3);
         when(store.claim(id)).thenReturn(Optional.of(op));
         when(probe.ping(any())).thenThrow(new IllegalStateException("bug"));
 

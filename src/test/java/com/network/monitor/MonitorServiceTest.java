@@ -1,15 +1,16 @@
 package com.network.monitor;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import com.network.device.Device;
 import com.network.device.DeviceType;
 import com.network.ping.PingOperationResponse;
 import com.network.ping.PingStatus;
+import org.junit.jupiter.api.Test;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class MonitorServiceTest {
 

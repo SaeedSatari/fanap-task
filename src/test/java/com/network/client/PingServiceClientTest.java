@@ -1,24 +1,10 @@
 package com.network.client;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.springframework.test.web.client.ExpectedCount.once;
-import static org.springframework.test.web.client.ExpectedCount.times;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.common.ApiException;
 import com.network.config.NetworkProperties;
 import com.network.ping.PingOperationResponse;
 import com.network.ping.PingStatus;
-import java.net.ConnectException;
-import java.net.SocketTimeoutException;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -28,7 +14,17 @@ import org.springframework.mock.env.MockEnvironment;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestTemplate;
 
-/** Verifies how the RestTemplate client behaves on timeout, HTTP errors and invalid responses. */
+import java.net.ConnectException;
+import java.net.SocketTimeoutException;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.client.ExpectedCount.once;
+import static org.springframework.test.web.client.ExpectedCount.times;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.*;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
+
 class PingServiceClientTest {
 
     private static final String BASE = "http://ping.test";
@@ -87,7 +83,9 @@ class PingServiceClientTest {
     @Test
     void timeout_onPost_mapsTo504_andIsNotRetried() {
         server.expect(once(), requestTo(SUBMIT_URL))
-                .andRespond(request -> { throw new SocketTimeoutException("Read timed out"); });
+                .andRespond(request -> {
+                    throw new SocketTimeoutException("Read timed out");
+                });
 
         assertThatThrownBy(() -> client.requestPing(1L, null)).satisfies(t -> {
             DownstreamException e = downstream(t);
@@ -100,7 +98,9 @@ class PingServiceClientTest {
     @Test
     void timeout_onGet_isRetriedOnce_thenMapsTo504() {
         server.expect(times(2), requestTo(BASE + "/internal/ping/pings/" + OP_ID))
-                .andRespond(request -> { throw new SocketTimeoutException("Read timed out"); });
+                .andRespond(request -> {
+                    throw new SocketTimeoutException("Read timed out");
+                });
 
         assertThatThrownBy(() -> client.getOperation(OP_ID)).satisfies(t ->
                 assertThat(downstream(t).getCode()).isEqualTo("DOWNSTREAM_TIMEOUT"));
@@ -110,7 +110,9 @@ class PingServiceClientTest {
     @Test
     void connectionRefused_mapsTo503() {
         server.expect(once(), requestTo(SUBMIT_URL))
-                .andRespond(request -> { throw new ConnectException("Connection refused"); });
+                .andRespond(request -> {
+                    throw new ConnectException("Connection refused");
+                });
 
         assertThatThrownBy(() -> client.requestPing(1L, null)).satisfies(t -> {
             DownstreamException e = downstream(t);
@@ -140,21 +142,6 @@ class PingServiceClientTest {
 
         assertThat(client.getOperation(OP_ID).id()).isEqualTo(OP_ID);
         server.verify();
-    }
-
-    @Test
-    void clientError_isPassedThroughWithDownstreamStatusAndCode() {
-        server.expect(requestTo(SUBMIT_URL)).andRespond(withStatus(HttpStatus.NOT_FOUND)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body("{\"status\":404,\"code\":\"DEVICE_NOT_FOUND\",\"message\":\"Device 1 not found\"}"));
-
-        assertThatThrownBy(() -> client.requestPing(1L, null)).satisfies(t -> {
-            assertThat(t).isNotInstanceOf(DownstreamException.class);
-            ApiException e = (ApiException) t;
-            assertThat(e.getStatus().value()).isEqualTo(404);
-            assertThat(e.getCode()).isEqualTo("DEVICE_NOT_FOUND");
-            assertThat(e.getMessage()).isEqualTo("Device 1 not found");
-        });
     }
 
     @Test

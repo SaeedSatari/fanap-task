@@ -61,10 +61,6 @@ public class DownstreamCaller {
     private static final int MAX_CAUSE_DEPTH = 10;
     private static final int MAX_ERROR_CODE_LENGTH = 64;
 
-    /**
-     * Only accepts machine-readable error codes.
-     * Prevents arbitrary downstream values from becoming public error codes.
-     */
     private static final Pattern SAFE_ERROR_CODE =
             Pattern.compile("[A-Z][A-Z0-9_]{0,63}");
 
@@ -82,12 +78,6 @@ public class DownstreamCaller {
         );
     }
 
-    /**
-     * Defines whether an operation can safely be retried.
-     * <p>
-     * IDEMPOTENT should only be used for operations that are genuinely
-     * safe to execute more than once, such as correctly implemented GETs.
-     */
     public enum RetryPolicy {
         NEVER,
         IDEMPOTENT
